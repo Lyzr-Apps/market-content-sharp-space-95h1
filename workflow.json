@@ -1,0 +1,92 @@
+{
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "Input",
+      "label": "Content Brief Input",
+      "nodeCategory": "input"
+    },
+    {
+      "id": "content_orchestrator",
+      "type": "Agent",
+      "label": "Content Orchestrator (Manager)",
+      "nodeCategory": "agent",
+      "agent_id": "699643be7c10308731d1314a",
+      "agent_name": "Content Orchestrator",
+      "agent_type": "manager",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "temperature": 0.3,
+      "top_p": 1,
+      "managed_agents": [
+        {
+          "id": "699643ab8c4e22200a885a39",
+          "name": "SEO Research Agent"
+        },
+        {
+          "id": "699643ab7952db745690f16d",
+          "name": "Copywriting Agent"
+        }
+      ]
+    },
+    {
+      "id": "seo_research_agent",
+      "type": "Agent",
+      "label": "SEO Research Agent",
+      "nodeCategory": "agent",
+      "agent_id": "699643ab8c4e22200a885a39",
+      "agent_name": "SEO Research Agent",
+      "agent_type": "sub-agent",
+      "provider": "Perplexity",
+      "model": "sonar-pro",
+      "temperature": 0.2,
+      "top_p": 1
+    },
+    {
+      "id": "copywriting_agent",
+      "type": "Agent",
+      "label": "Copywriting Agent",
+      "nodeCategory": "agent",
+      "agent_id": "699643ab7952db745690f16d",
+      "agent_name": "Copywriting Agent",
+      "agent_type": "sub-agent",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "temperature": 0.7,
+      "top_p": 0.95
+    },
+    {
+      "id": "publisher_agent",
+      "type": "Agent",
+      "label": "Multi-Platform Publisher Agent",
+      "nodeCategory": "agent",
+      "agent_id": "699643dbfa7935fa886621c7",
+      "agent_name": "Multi-Platform Publisher Agent",
+      "agent_type": "independent",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "temperature": 0.2,
+      "top_p": 1,
+      "tool_configs": [
+        {
+          "tool_name": "twitter",
+          "tool_source": "composio",
+          "action_names": ["TWITTER_CREATION_OF_A_POST"]
+        }
+      ]
+    },
+    {
+      "id": "output_node",
+      "type": "Output",
+      "label": "Published Content Output",
+      "nodeCategory": "end"
+    }
+  ],
+  "edges": [
+    { "source": "input_node", "target": "content_orchestrator" },
+    { "source": "content_orchestrator", "target": "seo_research_agent" },
+    { "source": "content_orchestrator", "target": "copywriting_agent" },
+    { "source": "content_orchestrator", "target": "publisher_agent" },
+    { "source": "publisher_agent", "target": "output_node" }
+  ]
+}

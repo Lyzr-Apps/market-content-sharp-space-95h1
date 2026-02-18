@@ -1,0 +1,76 @@
+{
+  "app_name": "Content Creation Assistant",
+  "created_at": "2026-02-18",
+  "agents": {
+    "seo_research_agent": {
+      "agent_id": "699643ab8c4e22200a885a39",
+      "name": "SEO Research Agent",
+      "type": "sub-agent",
+      "provider": "Perplexity",
+      "model": "sonar-pro",
+      "temperature": 0.2,
+      "top_p": 1,
+      "parent_manager": "699643be7c10308731d1314a",
+      "tool_configs": [],
+      "response_schema_file": "response_schemas/seo_research_agent_response.json"
+    },
+    "copywriting_agent": {
+      "agent_id": "699643ab7952db745690f16d",
+      "name": "Copywriting Agent",
+      "type": "sub-agent",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "parent_manager": "699643be7c10308731d1314a",
+      "tool_configs": [],
+      "response_schema_file": "response_schemas/copywriting_agent_response.json"
+    },
+    "content_orchestrator": {
+      "agent_id": "699643be7c10308731d1314a",
+      "name": "Content Orchestrator",
+      "type": "manager",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "temperature": 0.3,
+      "top_p": 1,
+      "managed_agents": [
+        {
+          "id": "699643ab8c4e22200a885a39",
+          "name": "SEO Research Agent"
+        },
+        {
+          "id": "699643ab7952db745690f16d",
+          "name": "Copywriting Agent"
+        }
+      ],
+      "tool_configs": [],
+      "response_schema_file": "response_schemas/content_orchestrator_response.json"
+    },
+    "publisher_agent": {
+      "agent_id": "699643dbfa7935fa886621c7",
+      "name": "Multi-Platform Publisher Agent",
+      "type": "independent",
+      "provider": "OpenAI",
+      "model": "gpt-4.1",
+      "temperature": 0.2,
+      "top_p": 1,
+      "tool_configs": [
+        {
+          "tool_name": "twitter",
+          "tool_source": "composio",
+          "action_names": ["TWITTER_CREATION_OF_A_POST"]
+        }
+      ],
+      "response_schema_file": "response_schemas/multi_platform_publisher_agent_response.json"
+    }
+  },
+  "primary_agent_id": "699643be7c10308731d1314a",
+  "publisher_agent_id": "699643dbfa7935fa886621c7",
+  "all_agent_ids": [
+    "699643ab8c4e22200a885a39",
+    "699643ab7952db745690f16d",
+    "699643be7c10308731d1314a",
+    "699643dbfa7935fa886621c7"
+  ]
+}

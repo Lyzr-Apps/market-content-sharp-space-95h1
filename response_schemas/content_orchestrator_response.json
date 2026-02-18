@@ -1,0 +1,46 @@
+{
+  "agent_name": "Content Orchestrator",
+  "agent_id": "699643be7c10308731d1314a",
+  "description": "Coordinates the content generation workflow - routes content requirements to SEO and copywriting sub-agents, aggregates final platform-ready content package",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "seo_keywords": [
+      "string"
+    ],
+    "trending_topics": [
+      "string"
+    ],
+    "optimization_strategy": "string",
+    "recommended_hashtags": [
+      "string"
+    ],
+    "twitter_post": "string",
+    "instagram_caption": "string",
+    "youtube_shorts_script": "string",
+    "fanvue_post": "string",
+    "seo_title": "string",
+    "meta_description": "string",
+    "content_summary": "string"
+  },
+  "example_response": {
+    "seo_keywords": [
+      "sample string"
+    ],
+    "trending_topics": [
+      "sample string"
+    ],
+    "optimization_strategy": "SEO optimization strategy",
+    "recommended_hashtags": [
+      "sample string"
+    ],
+    "twitter_post": "Twitter post copy",
+    "instagram_caption": "Instagram caption",
+    "youtube_shorts_script": "YouTube Shorts script",
+    "fanvue_post": "Fanvue post content",
+    "seo_title": "SEO-optimized title",
+    "meta_description": "Meta description",
+    "content_summary": "Summary of generated content"
+  }
+}

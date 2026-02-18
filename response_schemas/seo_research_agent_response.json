@@ -1,0 +1,22 @@
+{
+  "agent_name": "SEO Research Agent",
+  "agent_id": "699643ab8c4e22200a885a39",
+  "description": "Researches trending keywords, competitor content gaps, and SEO optimization strategies for the given topic and target platforms",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "keywords": ["string"],
+    "trending_topics": ["string"],
+    "optimization_strategy": "string",
+    "competitor_gaps": "string",
+    "recommended_hashtags": ["string"]
+  },
+  "example_response": {
+    "keywords": ["sample keyword"],
+    "trending_topics": ["sample topic"],
+    "optimization_strategy": "SEO optimization strategy summary",
+    "competitor_gaps": "Competitor content gaps identified",
+    "recommended_hashtags": ["#samplehashtag"]
+  }
+}

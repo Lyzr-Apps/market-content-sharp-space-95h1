@@ -1,0 +1,24 @@
+{
+  "agent_name": "Copywriting Agent",
+  "agent_id": "699643ab7952db745690f16d",
+  "description": "Generates brand-aligned, platform-specific marketing copy incorporating SEO recommendations, audience persona targeting, and brand voice guidelines",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "twitter_post": "string",
+    "instagram_caption": "string",
+    "youtube_shorts_script": "string",
+    "fanvue_post": "string",
+    "seo_title": "string",
+    "meta_description": "string"
+  },
+  "example_response": {
+    "twitter_post": "Twitter-optimized post copy",
+    "instagram_caption": "Instagram caption with hashtags",
+    "youtube_shorts_script": "YouTube Shorts script",
+    "fanvue_post": "Fanvue post content",
+    "seo_title": "SEO-optimized content title",
+    "meta_description": "Meta description for SEO"
+  }
+}

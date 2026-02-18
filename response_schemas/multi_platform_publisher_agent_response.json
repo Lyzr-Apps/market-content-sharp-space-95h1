@@ -1,0 +1,30 @@
+{
+  "agent_name": "Multi-Platform Publisher Agent",
+  "agent_id": "699643dbfa7935fa886621c7",
+  "description": "Takes finalized content and auto-publishes to Twitter, Instagram, YouTube Shorts, and Fanvue using respective APIs",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "twitter_status": "string",
+    "twitter_url": "string",
+    "instagram_status": "string",
+    "youtube_status": "string",
+    "fanvue_status": "string",
+    "overall_status": "string",
+    "errors": [
+      "string"
+    ]
+  },
+  "example_response": {
+    "twitter_status": "Twitter posting status (success/failed)",
+    "twitter_url": "URL of posted tweet if successful",
+    "instagram_status": "Instagram posting status",
+    "youtube_status": "YouTube Shorts posting status",
+    "fanvue_status": "Fanvue posting status",
+    "overall_status": "Overall publishing summary",
+    "errors": [
+      "sample string"
+    ]
+  }
+}
