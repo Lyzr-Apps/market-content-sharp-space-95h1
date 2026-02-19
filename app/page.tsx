@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { callAIAgent } from '@/lib/aiAgent'
 import { copyToClipboard } from '@/lib/clipboard'
 import { cn } from '@/lib/utils'
+import parseLLMJson from '@/lib/jsonParser'
 import { useLyzrAgentEvents } from '@/lib/lyzrAgentEvents'
 import { AgentActivityPanel } from '@/components/AgentActivityPanel'
 
@@ -294,6 +295,163 @@ function getPlatformStatus(status: PublishStatus, platform: string): string {
   if (lower.includes('youtube')) return status?.youtube_status ?? ''
   if (lower.includes('fanvue')) return status?.fanvue_status ?? ''
   return ''
+}
+
+// ─── Robust Response Extraction ──────────────────────────────────────────────
+
+/**
+ * Deeply extract OrchestratorContent from any response shape.
+ * Manager agents can return responses in many formats:
+ * - Direct JSON with expected fields
+ * - Stringified JSON inside result.text or result.response
+ * - Nested under result.result
+ * - Plain text with embedded JSON
+ */
+function extractOrchestratorContent(rawResult: any): OrchestratorContent {
+  if (!rawResult) return {}
+
+  // If it's a string, try to parse it as JSON
+  if (typeof rawResult === 'string') {
+    try {
+      const parsed = parseLLMJson(rawResult)
+      if (parsed && typeof parsed === 'object' && parsed.success !== false) {
+        return extractOrchestratorContent(parsed)
+      }
+    } catch { /* ignore */ }
+    // If it's plain text, treat it as content_summary
+    return { content_summary: rawResult }
+  }
+
+  // If it's not an object, bail
+  if (typeof rawResult !== 'object' || rawResult === null) return {}
+
+  // Check if expected fields exist at this level
+  const contentFields = ['twitter_post', 'instagram_caption', 'youtube_shorts_script', 'fanvue_post', 'seo_keywords', 'seo_title', 'content_summary']
+  const hasContentFields = contentFields.some(field => field in rawResult && rawResult[field])
+
+  if (hasContentFields) {
+    return {
+      seo_keywords: Array.isArray(rawResult.seo_keywords) ? rawResult.seo_keywords : [],
+      trending_topics: Array.isArray(rawResult.trending_topics) ? rawResult.trending_topics : [],
+      optimization_strategy: typeof rawResult.optimization_strategy === 'string' ? rawResult.optimization_strategy : '',
+      recommended_hashtags: Array.isArray(rawResult.recommended_hashtags) ? rawResult.recommended_hashtags : [],
+      twitter_post: typeof rawResult.twitter_post === 'string' ? rawResult.twitter_post : '',
+      instagram_caption: typeof rawResult.instagram_caption === 'string' ? rawResult.instagram_caption : '',
+      youtube_shorts_script: typeof rawResult.youtube_shorts_script === 'string' ? rawResult.youtube_shorts_script : '',
+      fanvue_post: typeof rawResult.fanvue_post === 'string' ? rawResult.fanvue_post : '',
+      seo_title: typeof rawResult.seo_title === 'string' ? rawResult.seo_title : '',
+      meta_description: typeof rawResult.meta_description === 'string' ? rawResult.meta_description : '',
+      content_summary: typeof rawResult.content_summary === 'string' ? rawResult.content_summary : '',
+    }
+  }
+
+  // Try nested structures: result.result, result.response, result.data, result.text, result.message
+  const unwrapKeys = ['result', 'response', 'data', 'output', 'text', 'message', 'content']
+  for (const key of unwrapKeys) {
+    if (rawResult[key] != null) {
+      const nested = rawResult[key]
+      if (typeof nested === 'string') {
+        try {
+          const parsed = parseLLMJson(nested)
+          if (parsed && typeof parsed === 'object') {
+            const extracted = extractOrchestratorContent(parsed)
+            if (Object.values(extracted).some(v => v && (typeof v === 'string' ? v.length > 0 : Array.isArray(v) && v.length > 0))) {
+              return extracted
+            }
+          }
+        } catch { /* ignore */ }
+      } else if (typeof nested === 'object') {
+        const extracted = extractOrchestratorContent(nested)
+        if (Object.values(extracted).some(v => v && (typeof v === 'string' ? v.length > 0 : Array.isArray(v) && v.length > 0))) {
+          return extracted
+        }
+      }
+    }
+  }
+
+  // Last resort: try to get any text content
+  const textContent = rawResult.text || rawResult.message || rawResult.response || rawResult.answer || rawResult.summary
+  if (typeof textContent === 'string' && textContent.length > 0) {
+    // Try parsing embedded JSON from text
+    try {
+      const parsed = parseLLMJson(textContent)
+      if (parsed && typeof parsed === 'object') {
+        const extracted = extractOrchestratorContent(parsed)
+        if (Object.values(extracted).some(v => v && (typeof v === 'string' ? v.length > 0 : Array.isArray(v) && v.length > 0))) {
+          return extracted
+        }
+      }
+    } catch { /* ignore */ }
+    return { content_summary: textContent }
+  }
+
+  // If rawResult itself has some useful keys, return it as-is
+  return rawResult as OrchestratorContent
+}
+
+/**
+ * Deeply extract PublishStatus from any response shape.
+ */
+function extractPublishStatus(rawResult: any): PublishStatus {
+  if (!rawResult) return {}
+
+  if (typeof rawResult === 'string') {
+    try {
+      const parsed = parseLLMJson(rawResult)
+      if (parsed && typeof parsed === 'object') {
+        return extractPublishStatus(parsed)
+      }
+    } catch { /* ignore */ }
+    return { overall_status: rawResult }
+  }
+
+  if (typeof rawResult !== 'object' || rawResult === null) return {}
+
+  const statusFields = ['twitter_status', 'instagram_status', 'youtube_status', 'fanvue_status', 'overall_status']
+  const hasStatusFields = statusFields.some(field => field in rawResult && rawResult[field])
+
+  if (hasStatusFields) {
+    return {
+      twitter_status: typeof rawResult.twitter_status === 'string' ? rawResult.twitter_status : undefined,
+      twitter_url: typeof rawResult.twitter_url === 'string' ? rawResult.twitter_url : undefined,
+      instagram_status: typeof rawResult.instagram_status === 'string' ? rawResult.instagram_status : undefined,
+      youtube_status: typeof rawResult.youtube_status === 'string' ? rawResult.youtube_status : undefined,
+      fanvue_status: typeof rawResult.fanvue_status === 'string' ? rawResult.fanvue_status : undefined,
+      overall_status: typeof rawResult.overall_status === 'string' ? rawResult.overall_status : undefined,
+      errors: Array.isArray(rawResult.errors) ? rawResult.errors : [],
+    }
+  }
+
+  // Unwrap nested structures
+  const unwrapKeys = ['result', 'response', 'data', 'output', 'text', 'message']
+  for (const key of unwrapKeys) {
+    if (rawResult[key] != null) {
+      const nested = rawResult[key]
+      if (typeof nested === 'string') {
+        try {
+          const parsed = parseLLMJson(nested)
+          if (parsed && typeof parsed === 'object') {
+            const extracted = extractPublishStatus(parsed)
+            if (Object.values(extracted).some(v => v && (typeof v === 'string' ? v.length > 0 : Array.isArray(v) && v.length > 0))) {
+              return extracted
+            }
+          }
+        } catch { /* ignore */ }
+      } else if (typeof nested === 'object') {
+        const extracted = extractPublishStatus(nested)
+        if (Object.values(extracted).some(v => v && (typeof v === 'string' ? v.length > 0 : Array.isArray(v) && v.length > 0))) {
+          return extracted
+        }
+      }
+    }
+  }
+
+  const textContent = rawResult.text || rawResult.message || rawResult.response
+  if (typeof textContent === 'string') {
+    return { overall_status: textContent }
+  }
+
+  return rawResult as PublishStatus
 }
 
 // ─── Sub-Components ──────────────────────────────────────────────────────────
@@ -664,16 +822,28 @@ export default function Page() {
     } catch { /* ignore */ }
   }, [settings])
 
-  const buildPromptMessage = useCallback((): string => {
-    let message = `Create content for the following:\n\nTopic/Brief: ${form.topic}\n`
-    if (form.platforms.length > 0) {
-      message += `Target Platforms: ${form.platforms.join(', ')}\n`
+  const getEffectiveForm = useCallback((): ContentForm => {
+    if (sampleDataOn) {
+      return {
+        topic: form.topic || 'Sustainable fashion tips for eco-conscious millennials - focus on wardrobe essentials and budget-friendly swaps',
+        platforms: form.platforms.length > 0 ? form.platforms : [...PLATFORMS],
+        contentType: form.contentType || 'post',
+        instructions: form.instructions || 'Use a conversational, empowering tone. Include actionable tips and a clear CTA.',
+      }
     }
-    if (form.contentType) {
-      message += `Content Type: ${form.contentType}\n`
+    return form
+  }, [form, sampleDataOn])
+
+  const buildPromptMessage = useCallback((effectiveForm: ContentForm): string => {
+    let message = `Create content for the following:\n\nTopic/Brief: ${effectiveForm.topic}\n`
+    if (effectiveForm.platforms.length > 0) {
+      message += `Target Platforms: ${effectiveForm.platforms.join(', ')}\n`
     }
-    if (form.instructions) {
-      message += `Additional Instructions: ${form.instructions}\n`
+    if (effectiveForm.contentType) {
+      message += `Content Type: ${effectiveForm.contentType}\n`
+    }
+    if (effectiveForm.instructions) {
+      message += `Additional Instructions: ${effectiveForm.instructions}\n`
     }
 
     const hasSettings = Object.values(settings).some(v => v.trim().length > 0)
@@ -691,19 +861,23 @@ export default function Page() {
       if (settings.restrictedLanguage) message += `Restricted Language: ${settings.restrictedLanguage}\n`
     }
 
+    message += '\n\nIMPORTANT: Return your response as valid JSON with these exact fields: seo_keywords (array of strings), trending_topics (array of strings), optimization_strategy (string), recommended_hashtags (array of strings), twitter_post (string), instagram_caption (string), youtube_shorts_script (string), fanvue_post (string), seo_title (string), meta_description (string), content_summary (string).'
+
     return message
-  }, [form, settings])
+  }, [settings])
 
   const handleGenerateAndPublish = useCallback(async () => {
-    if (!form.topic.trim()) {
+    const effectiveForm = getEffectiveForm()
+
+    if (!effectiveForm.topic.trim()) {
       setError('Please enter a topic or brief.')
       return
     }
-    if (form.platforms.length === 0) {
+    if (effectiveForm.platforms.length === 0) {
       setError('Please select at least one platform.')
       return
     }
-    if (!form.contentType) {
+    if (!effectiveForm.contentType) {
       setError('Please select a content type.')
       return
     }
@@ -721,7 +895,7 @@ export default function Page() {
     agentActivity.setProcessing(true)
 
     try {
-      const message = buildPromptMessage()
+      const message = buildPromptMessage(effectiveForm)
 
       const progressInterval = setInterval(() => {
         setLoadingProgress(prev => Math.min(prev + 2, 45))
@@ -736,8 +910,30 @@ export default function Page() {
         setSessionId(orchestratorResult.session_id)
       }
 
-      if (orchestratorResult?.success && orchestratorResult?.response?.status === 'success') {
-        const content: OrchestratorContent = orchestratorResult?.response?.result ?? {}
+      // Check for success - be lenient with manager agent responses
+      const isSuccess = orchestratorResult?.success === true
+      const responseResult = orchestratorResult?.response?.result
+      const responseMessage = orchestratorResult?.response?.message
+      const rawResponse = orchestratorResult?.raw_response
+
+      if (isSuccess) {
+        // Use robust extraction to handle all manager agent response formats
+        let content: OrchestratorContent = extractOrchestratorContent(responseResult)
+
+        // If extraction yielded nothing useful, try extracting from the message or raw response
+        const hasUsefulContent = content.twitter_post || content.instagram_caption || content.youtube_shorts_script || content.fanvue_post || content.content_summary
+        if (!hasUsefulContent && responseMessage) {
+          content = extractOrchestratorContent(responseMessage)
+        }
+        if (!hasUsefulContent && rawResponse) {
+          try {
+            const rawParsed = parseLLMJson(rawResponse)
+            if (rawParsed && typeof rawParsed === 'object') {
+              content = extractOrchestratorContent(rawParsed)
+            }
+          } catch { /* ignore */ }
+        }
+
         setGeneratedContent(content)
         setLoadingPhase('Publishing to platforms...')
         setActiveAgentIdState(PUBLISHER_AGENT_ID)
@@ -746,7 +942,7 @@ export default function Page() {
           setLoadingProgress(prev => Math.min(prev + 3, 90))
         }, 600)
 
-        const publishMessage = `Publish the following content:\nTwitter: ${content?.twitter_post ?? 'N/A'}\nInstagram: ${content?.instagram_caption ?? 'N/A'}\nYouTube Shorts: ${content?.youtube_shorts_script ?? 'N/A'}\nFanvue: ${content?.fanvue_post ?? 'N/A'}\nTarget Platforms: ${form.platforms.join(', ')}`
+        const publishMessage = `Publish the following content to the specified platforms. Only publish to the platforms listed.\n\nTarget Platforms: ${effectiveForm.platforms.join(', ')}\n\nTwitter Post: ${content?.twitter_post || 'N/A'}\n\nInstagram Caption: ${content?.instagram_caption || 'N/A'}\n\nYouTube Shorts Script: ${content?.youtube_shorts_script || 'N/A'}\n\nFanvue Post: ${content?.fanvue_post || 'N/A'}\n\nIMPORTANT: Return your response as valid JSON with these exact fields: twitter_status (string), twitter_url (string), instagram_status (string), youtube_status (string), fanvue_status (string), overall_status (string), errors (array of strings).`
 
         const publishResult = await callAIAgent(publishMessage, PUBLISHER_AGENT_ID)
 
@@ -758,31 +954,46 @@ export default function Page() {
         }
 
         let pubStatus: PublishStatus = {}
-        if (publishResult?.success && publishResult?.response?.status === 'success') {
-          pubStatus = publishResult?.response?.result ?? {}
+        if (publishResult?.success) {
+          pubStatus = extractPublishStatus(publishResult?.response?.result)
+          // If extraction found nothing, try the message or raw response
+          if (!pubStatus.overall_status && publishResult?.response?.message) {
+            pubStatus = extractPublishStatus(publishResult.response.message)
+          }
+          if (!pubStatus.overall_status && publishResult?.raw_response) {
+            try {
+              const rawParsed = parseLLMJson(publishResult.raw_response)
+              if (rawParsed) pubStatus = extractPublishStatus(rawParsed)
+            } catch { /* ignore */ }
+          }
+          if (!pubStatus.overall_status) {
+            pubStatus.overall_status = 'Publishing initiated'
+          }
           setPublishStatus(pubStatus)
           setSuccessMessage(pubStatus?.overall_status ?? 'Content generated and publishing initiated!')
         } else {
-          pubStatus = { overall_status: 'Publishing may have encountered issues', errors: [publishResult?.response?.message ?? 'Unknown publishing error'] }
+          pubStatus = { overall_status: 'Publishing may have encountered issues', errors: [publishResult?.response?.message ?? publishResult?.error ?? 'Unknown publishing error'] }
           setPublishStatus(pubStatus)
-          setSuccessMessage('Content generated! Publishing status may need review.')
+          setSuccessMessage('Content generated successfully! Publishing status may need review.')
         }
 
         const historyItem: ContentHistoryItem = {
           id: generateId(),
           timestamp: new Date().toISOString(),
-          topic: form.topic,
-          contentType: form.contentType,
-          platforms: [...form.platforms],
+          topic: effectiveForm.topic,
+          contentType: effectiveForm.contentType,
+          platforms: [...effectiveForm.platforms],
           content,
           publishStatus: pubStatus,
         }
         setHistory(prev => [historyItem, ...prev])
       } else {
-        setError(orchestratorResult?.response?.message ?? 'Content generation failed. Please try again.')
+        const errorMsg = orchestratorResult?.response?.message || orchestratorResult?.error || 'Content generation failed. Please try again.'
+        setError(errorMsg)
       }
-    } catch {
-      setError('An unexpected error occurred. Please try again.')
+    } catch (err) {
+      const errorDetail = err instanceof Error ? err.message : 'Unknown error'
+      setError(`An unexpected error occurred: ${errorDetail}. Please try again.`)
     } finally {
       setLoading(false)
       setLoadingPhase('')
@@ -790,7 +1001,7 @@ export default function Page() {
       setActiveAgentIdState(null)
       agentActivity.setProcessing(false)
     }
-  }, [form, buildPromptMessage, agentActivity])
+  }, [form, sampleDataOn, getEffectiveForm, buildPromptMessage, agentActivity])
 
   const togglePlatform = useCallback((platform: string) => {
     setForm(prev => ({
@@ -866,9 +1077,10 @@ export default function Page() {
         {(error || successMessage || copyStatus) && (
           <div className="px-6 pt-3 shrink-0 space-y-2">
             {error && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                <AlertCircle className="h-4 w-4 shrink-0" /> {error}
-                <button onClick={() => setError(null)} className="ml-auto"><X className="h-4 w-4" /></button>
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span className="flex-1 break-words line-clamp-4">{error}</span>
+                <button onClick={() => setError(null)} className="ml-auto shrink-0"><X className="h-4 w-4" /></button>
               </div>
             )}
             {successMessage && (
